@@ -7,28 +7,35 @@ import FeedStoreChallenge
 
 class InMemoryFeedStore: FeedStore {
     private var cache: (feed: [LocalFeedImage], timestamp: Date)?
+    private let queue = DispatchQueue(label: "\(type(of: InMemoryFeedStore.self))Queue", attributes: .concurrent)
 
     func deleteCachedFeed(completion: @escaping DeletionCompletion) {
-        cache = nil
-        completion(nil)
+        queue.async(flags: .barrier) {
+            self.cache = nil
+            completion(nil)
+        }
     }
 
     func insert(_ feed: [LocalFeedImage], timestamp: Date, completion: @escaping InsertionCompletion) {
-        cache = (feed, timestamp)
-        completion(nil)
+        queue.async(flags: .barrier) {
+            self.cache = (feed, timestamp)
+            completion(nil)
+        }
     }
 
     func retrieve(completion: @escaping RetrievalCompletion) {
-        if let cache = cache {
-            completion(.found(feed: cache.feed, timestamp: cache.timestamp))
-        } else {
-            completion(.empty)
+        queue.async {
+            if let cache = self.cache {
+                completion(.found(feed: cache.feed, timestamp: cache.timestamp))
+            } else {
+                completion(.empty)
+            }
         }
     }
 }
 
 class FeedStoreChallengeTests: XCTestCase, FeedStoreSpecs {
-	
+
     //  ***********************
     //
     //  Follow the TDD process:
@@ -41,84 +48,84 @@ class FeedStoreChallengeTests: XCTestCase, FeedStoreSpecs {
     //
     //  ***********************
 
-	func test_retrieve_deliversEmptyOnEmptyCache() {
-		let sut = makeSUT()
+    func test_retrieve_deliversEmptyOnEmptyCache() {
+        let sut = makeSUT()
 
-		assertThatRetrieveDeliversEmptyOnEmptyCache(on: sut)
-	}
+        assertThatRetrieveDeliversEmptyOnEmptyCache(on: sut)
+    }
 
-	func test_retrieve_hasNoSideEffectsOnEmptyCache() {
-		let sut = makeSUT()
+    func test_retrieve_hasNoSideEffectsOnEmptyCache() {
+        let sut = makeSUT()
 
-		assertThatRetrieveHasNoSideEffectsOnEmptyCache(on: sut)
-	}
+        assertThatRetrieveHasNoSideEffectsOnEmptyCache(on: sut)
+    }
 
-	func test_retrieve_deliversFoundValuesOnNonEmptyCache() {
-		let sut = makeSUT()
+    func test_retrieve_deliversFoundValuesOnNonEmptyCache() {
+        let sut = makeSUT()
 
-		assertThatRetrieveDeliversFoundValuesOnNonEmptyCache(on: sut)
-	}
+        assertThatRetrieveDeliversFoundValuesOnNonEmptyCache(on: sut)
+    }
 
-	func test_retrieve_hasNoSideEffectsOnNonEmptyCache() {
-		let sut = makeSUT()
+    func test_retrieve_hasNoSideEffectsOnNonEmptyCache() {
+        let sut = makeSUT()
 
-		assertThatRetrieveHasNoSideEffectsOnNonEmptyCache(on: sut)
-	}
+        assertThatRetrieveHasNoSideEffectsOnNonEmptyCache(on: sut)
+    }
 
-	func test_insert_deliversNoErrorOnEmptyCache() {
-		let sut = makeSUT()
+    func test_insert_deliversNoErrorOnEmptyCache() {
+        let sut = makeSUT()
 
-		assertThatInsertDeliversNoErrorOnEmptyCache(on: sut)
-	}
+        assertThatInsertDeliversNoErrorOnEmptyCache(on: sut)
+    }
 
-	func test_insert_deliversNoErrorOnNonEmptyCache() {
-		let sut = makeSUT()
+    func test_insert_deliversNoErrorOnNonEmptyCache() {
+        let sut = makeSUT()
 
-		assertThatInsertDeliversNoErrorOnNonEmptyCache(on: sut)
-	}
+        assertThatInsertDeliversNoErrorOnNonEmptyCache(on: sut)
+    }
 
-	func test_insert_overridesPreviouslyInsertedCacheValues() {
-		let sut = makeSUT()
+    func test_insert_overridesPreviouslyInsertedCacheValues() {
+        let sut = makeSUT()
 
-		assertThatInsertOverridesPreviouslyInsertedCacheValues(on: sut)
-	}
+        assertThatInsertOverridesPreviouslyInsertedCacheValues(on: sut)
+    }
 
-	func test_delete_deliversNoErrorOnEmptyCache() {
-		let sut = makeSUT()
+    func test_delete_deliversNoErrorOnEmptyCache() {
+        let sut = makeSUT()
 
-		assertThatDeleteDeliversNoErrorOnEmptyCache(on: sut)
-	}
+        assertThatDeleteDeliversNoErrorOnEmptyCache(on: sut)
+    }
 
-	func test_delete_hasNoSideEffectsOnEmptyCache() {
-		let sut = makeSUT()
+    func test_delete_hasNoSideEffectsOnEmptyCache() {
+        let sut = makeSUT()
 
-		assertThatDeleteHasNoSideEffectsOnEmptyCache(on: sut)
-	}
+        assertThatDeleteHasNoSideEffectsOnEmptyCache(on: sut)
+    }
 
-	func test_delete_deliversNoErrorOnNonEmptyCache() {
-		let sut = makeSUT()
+    func test_delete_deliversNoErrorOnNonEmptyCache() {
+        let sut = makeSUT()
 
-		assertThatDeleteDeliversNoErrorOnNonEmptyCache(on: sut)
-	}
+        assertThatDeleteDeliversNoErrorOnNonEmptyCache(on: sut)
+    }
 
-	func test_delete_emptiesPreviouslyInsertedCache() {
-		let sut = makeSUT()
+    func test_delete_emptiesPreviouslyInsertedCache() {
+        let sut = makeSUT()
 
-		assertThatDeleteEmptiesPreviouslyInsertedCache(on: sut)
-	}
+        assertThatDeleteEmptiesPreviouslyInsertedCache(on: sut)
+    }
 
-	func test_storeSideEffects_runSerially() {
-//		let sut = makeSUT()
-//
-//		assertThatSideEffectsRunSerially(on: sut)
-	}
-	
-	// - MARK: Helpers
-	
-	private func makeSUT() -> FeedStore {
-		InMemoryFeedStore()
-	}
-	
+    func test_storeSideEffects_runSerially() {
+        let sut = makeSUT()
+
+        assertThatSideEffectsRunSerially(on: sut)
+    }
+
+    // - MARK: Helpers
+
+    private func makeSUT() -> FeedStore {
+        InMemoryFeedStore()
+    }
+
 }
 
 //  ***********************
